@@ -1,0 +1,61 @@
+fix migration
+
+https://stackoverflow.com/questions/72682474/typeorm-migrationgenerate-failure-not-enough-non-option-arguments-got-0-need
+
+
+I had a similar issue but solved it initially using a util file like this
+
+// contents of migration.ts
+
+import { exec } from 'child_process';
+
+const command = `npm run typeorm migration:create ./src/migrations/${process.argv[process.argv.length - 1]}`;
+
+(() => exec(command, (error, stdout, stderr) => {
+  if (error !== null) {
+    console.error(stderr);
+  }
+  console.log(stdout);
+}))();
+
+In the package.json:
+
+"migration:create": "ts-node migration.ts"
+
+And to use, type the following:
+
+npm run migration:create unique-key-username
+
+But here's how it should be done after the latest changes in TypeORM:
+
+
+// new syntax for TypeORM ormconfig.ts
+
+const { DataSource } = require("typeorm");
+
+require('dotenv').config();
+for (const envName of Object.keys(process.env)) {
+  process.env[envName] = process.env[envName].replace(/\\n/g, '\n');
+}
+
+const connectionSource = new DataSource({
+  type: 'mysql',
+  host: process.env.DB_HOST,
+  port: +process.env.DB_PORT,
+  username: process.env.DB_USERNAME,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE,
+  entities: [__dirname + '/entities/**/*.{js,ts}'],
+  migrations: [__dirname + '/dist/src/migrations/*.js'],
+});
+
+module.exports = {
+  connectionSource,
+}
+
+// package.json
+
+"typeorm": "ts-node node_modules/typeorm/cli.js",
+"migration:create": "ts-node migration.ts  -d ./ormconfig.ts",
+"migration:run": "typeorm migration:run -d ./ormconfig.ts",
+"migration:revert": "typeorm migration:revert  -d ./ormconfig.ts",
